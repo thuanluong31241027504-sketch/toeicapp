@@ -3,7 +3,9 @@ import sys
 from pathlib import Path
 
 # Thêm đường dẫn data vào sys.path để import linh hoạt
-sys.path.append(str(Path(__file__).parent.parent / 'data'))
+data_path = Path(__file__).parent.parent / 'data'
+if str(data_path) not in sys.path:
+    sys.path.insert(0, str(data_path))
 
 def load_questions(module_name='questions'):
     """
@@ -20,13 +22,20 @@ def load_questions(module_name='questions'):
         module = importlib.import_module(f'data.{module_name}')
         questions = getattr(module, 'QUESTIONS', [])
         return questions
-    except ImportError:
-        # Nếu không tìm thấy module, load file mặc định
+    except (ImportError, AttributeError):
+        # Nếu không tìm thấy module, thử load trực tiếp
         try:
-            from data import questions as default_module
-            return default_module.QUESTIONS
-        except ImportError:
-            return []
+            # Thử import từ thư mục data
+            import importlib.util
+            file_path = Path(__file__).parent.parent / 'data' / f'{module_name}.py'
+            if file_path.exists():
+                spec = importlib.util.spec_from_file_location(module_name, file_path)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                return getattr(module, 'QUESTIONS', [])
+        except Exception:
+            pass
+        return []
 
 def get_available_question_sets():
     """
