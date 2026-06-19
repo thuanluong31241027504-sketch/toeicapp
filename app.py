@@ -1,8 +1,19 @@
 import streamlit as st
 import pandas as pd
-from config import TOEIC_CONFIG, UI_CONFIG, SECTIONS
-from utils.scoring import calculate_toeic_reading_score, get_section_scores
-from utils.data_loader import load_questions, get_available_question_sets, merge_questions
+import sys
+from pathlib import Path
+
+# Thêm đường dẫn vào sys.path
+sys.path.insert(0, str(Path(__file__).parent))
+
+# Import các module
+try:
+    from config import TOEIC_CONFIG, UI_CONFIG, SECTIONS
+    from utils.scoring import calculate_toeic_reading_score, get_section_scores
+    from utils.data_loader import load_questions, get_available_question_sets, merge_questions
+except ImportError as e:
+    st.error(f"Lỗi import module: {e}")
+    st.stop()
 
 # Cấu hình trang
 st.set_page_config(
@@ -38,12 +49,18 @@ st.markdown("""
         color: #FF4B4B;
         font-weight: bold;
     }
+    .question-container {
+        background-color: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin: 10px 0;
+        border: 1px solid #e0e0e0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # Khởi tạo session state
 if 'current_questions' not in st.session_state:
-    # Load mặc định từ file questions
     st.session_state.current_questions = load_questions()
     st.session_state.question_sets = ['questions']
 
@@ -74,7 +91,6 @@ def get_user_answer(question_id):
 
 # Sidebar - Điều khiển
 with st.sidebar:
-    st.image("https://img.icons8.com/color/96/000000/toeic.png", width=80)
     st.title("📚 TOEIC Reading")
     
     # Phần chọn bộ câu hỏi
@@ -130,7 +146,7 @@ with col2:
     answered = len([a for a in st.session_state.user_answers.values() if a is not None])
     st.metric("Answered", f"{answered}/{len(st.session_state.current_questions)}")
 with col3:
-    if st.session_state.submitted:
+    if st.session_state.submitted and len(st.session_state.current_questions) > 0:
         # Tính điểm dựa trên câu trả lời
         correct_count = 0
         for q in st.session_state.current_questions:
@@ -146,7 +162,13 @@ st.markdown("---")
 st.subheader("📝 Questions")
 
 if not st.session_state.current_questions:
-    st.warning("No questions available. Please check your data files.")
+    st.warning("⚠️ No questions available. Please check your data files.")
+    st.info("""
+    **How to add questions:**
+    1. Create a new file in the `data` folder
+    2. Define a `QUESTIONS` list with the correct format
+    3. The app will automatically detect it
+    """)
 else:
     # Nhóm câu hỏi theo phần
     questions_by_part = {}
@@ -161,13 +183,19 @@ else:
     
     for i, (part, questions) in enumerate(questions_by_part.items()):
         with tabs[i]:
-            st.write(f"### {part} - {SECTIONS.get(part, {}).get('name', '')}")
+            section_name = SECTIONS.get(part, {}).get('name', '')
+            if section_name:
+                st.write(f"### {part} - {section_name}")
+            else:
+                st.write(f"### {part}")
             
             for q in questions:
                 with st.container():
-                    col1, col2 = st.columns([0.9, 0.1])
-                    with col1:
-                        st.write(f"**{q['id']}. {q['question']}**")
+                    st.markdown(f"""
+                    <div class='question-container'>
+                        <p><b>{q['id']}. {q['question']}</b></p>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
                     # Hiển thị options
                     options = q['options']
@@ -178,8 +206,9 @@ else:
                         "Choose your answer:",
                         options,
                         key=f"q_{q['id']}",
-                        index=options.index(user_ans) if user_ans in options else None,
-                        horizontal=True
+                        index=options.index(user_ans) if user_ans is not None and user_ans in range(len(options)) else None,
+                        horizontal=True,
+                        label_visibility="collapsed"
                     )
                     
                     # Lưu câu trả lời
@@ -190,9 +219,9 @@ else:
                     # Nếu đã submit, hiển thị kết quả
                     if st.session_state.submitted:
                         correct = q['correct']
-                        is_correct = selected_index == correct if selected_index is not None else False
-                        
-                        if selected_index is not None:
+                        if selected and selected_index is not None:
+                            is_correct = selected_index == correct
+                            
                             if is_correct:
                                 st.success("✅ Correct!")
                             else:
@@ -217,7 +246,7 @@ with col2:
             st.rerun()
 
 # Hiển thị kết quả chi tiết
-if st.session_state.submitted:
+if st.session_state.submitted and len(st.session_state.current_questions) > 0:
     st.markdown("---")
     st.subheader("📊 Your Results")
     
@@ -248,7 +277,7 @@ if st.session_state.submitted:
         st.markdown(f"""
         <div class='score-card'>
             <h3>Score</h3>
-            <h1>{result['score']}</h1>
+            <h1 style='font-size: 48px;'>{result['score']}</h1>
             <p>/ 495</p>
         </div>
         """, unsafe_allow_html=True)
@@ -257,7 +286,7 @@ if st.session_state.submitted:
         st.markdown(f"""
         <div class='score-card'>
             <h3>Correct</h3>
-            <h1>{total_correct}/{total_attempted}</h1>
+            <h1 style='font-size: 48px;'>{total_correct}/{total_attempted}</h1>
             <p>{result['correct_percentage']}%</p>
         </div>
         """, unsafe_allow_html=True)
@@ -266,7 +295,7 @@ if st.session_state.submitted:
         st.markdown(f"""
         <div class='score-card'>
             <h3>Band Level</h3>
-            <h2>{result['band_level']}</h2>
+            <h2 style='font-size: 24px;'>{result['band_level']}</h2>
         </div>
         """, unsafe_allow_html=True)
     
@@ -275,28 +304,29 @@ if st.session_state.submitted:
         st.markdown(f"""
         <div class='score-card'>
             <h3>Status</h3>
-            <h1 class='{status_class}'>{result['status']}</h1>
+            <h1 class='{status_class}' style='font-size: 40px;'>{result['status']}</h1>
         </div>
         """, unsafe_allow_html=True)
     
     # Phân tích theo phần
-    st.subheader("📈 Performance by Section")
-    section_scores = get_section_scores(correct_by_section, attempted_by_section)
-    
-    # Tạo dataframe cho từng phần
-    section_data = []
-    for section, data in section_scores.items():
-        section_data.append({
-            'Section': section,
-            'Correct': data['correct'],
-            'Attempted': data['attempted'],
-            'Accuracy': f"{data['percentage']}%",
-            'Status': data['status']
-        })
-    
-    if section_data:
-        df = pd.DataFrame(section_data)
-        st.dataframe(df, use_container_width=True)
+    if correct_by_section or attempted_by_section:
+        st.subheader("📈 Performance by Section")
+        section_scores = get_section_scores(correct_by_section, attempted_by_section)
+        
+        # Tạo dataframe cho từng phần
+        section_data = []
+        for section, data in section_scores.items():
+            section_data.append({
+                'Section': section,
+                'Correct': data['correct'],
+                'Attempted': data['attempted'],
+                'Accuracy': f"{data['percentage']}%",
+                'Status': data['status']
+            })
+        
+        if section_data:
+            df = pd.DataFrame(section_data)
+            st.dataframe(df, use_container_width=True)
     
     # Lời khuyên
     st.subheader("💡 Recommendations")
@@ -310,11 +340,14 @@ if st.session_state.submitted:
         st.error("💪 Don't give up! Start with basic reading materials and practice regularly.")
     
     # Đề xuất bài tập
-    st.subheader("📚 Suggested Practice")
-    weak_sections = [s for s, d in section_scores.items() if d['percentage'] < 70]
-    if weak_sections:
-        st.write(f"Focus on improving: **{', '.join(weak_sections)}**")
-        st.write("Try more practice questions in these sections to improve your score.")
+    if section_data:
+        st.subheader("📚 Suggested Practice")
+        weak_sections = [s for s, d in section_scores.items() if d['percentage'] < 70]
+        if weak_sections:
+            st.write(f"Focus on improving: **{', '.join(weak_sections)}**")
+            st.write("Try more practice questions in these sections to improve your score.")
+        else:
+            st.write("🎉 You're doing great in all sections! Try more challenging questions to continue improving.")
 
 # Footer
 st.markdown("---")
