@@ -12,7 +12,7 @@ try:
     from utils.scoring import calculate_toeic_reading_score, get_section_scores
     from utils.data_loader import load_questions, get_available_question_sets, merge_questions
 except ImportError as e:
-    st.error(f"Lỗi import module: {e}")
+    st.error("Loi import module: " + str(e))
     st.stop()
 
 # Cấu hình trang
@@ -22,9 +22,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# CSS tùy chỉnh - Sử dụng chuỗi đơn
-css_style = '''
-<style>
+# CSS tùy chỉnh
+st.markdown(
+    '''
+    <style>
     .main-header {
         color: #FF4B4B;
         text-align: center;
@@ -37,11 +38,6 @@ css_style = '''
         border-radius: 10px;
         margin: 10px 0;
         text-align: center;
-    }
-    .band-level {
-        font-size: 24px;
-        font-weight: bold;
-        color: #0066CC;
     }
     .status-pass {
         color: #00CC66;
@@ -58,13 +54,10 @@ css_style = '''
         margin: 10px 0;
         border: 1px solid #e0e0e0;
     }
-    .stRadio > div {
-        flex-direction: row;
-        gap: 20px;
-    }
-</style>
-'''
-st.markdown(css_style, unsafe_allow_html=True)
+    </style>
+    ''',
+    unsafe_allow_html=True
+)
 
 # Khởi tạo session state
 if 'current_questions' not in st.session_state:
@@ -78,13 +71,11 @@ if 'submitted' not in st.session_state:
     st.session_state.submitted = False
 
 def reset_app():
-    """Reset toàn bộ ứng dụng"""
     st.session_state.user_answers = {}
     st.session_state.submitted = False
     st.rerun()
 
 def load_question_set(set_names):
-    """Load bộ câu hỏi được chọn"""
     if set_names:
         st.session_state.current_questions = merge_questions(set_names)
         st.session_state.question_sets = set_names
@@ -93,19 +84,16 @@ def load_question_set(set_names):
         st.rerun()
 
 def get_user_answer(question_id):
-    """Lấy câu trả lời của user cho 1 câu hỏi"""
     return st.session_state.user_answers.get(str(question_id), None)
 
-# Sidebar - Điều khiển
+# Sidebar
 with st.sidebar:
     st.title("📚 TOEIC Reading")
     
-    # Phần chọn bộ câu hỏi
     st.subheader("📖 Select Question Set")
     available_sets = get_available_question_sets()
     
     if available_sets:
-        # Xác định default values
         default_values = []
         if 'questions' in st.session_state.question_sets:
             if 'questions' in available_sets:
@@ -122,46 +110,39 @@ with st.sidebar:
         if selected_sets and selected_sets != st.session_state.question_sets:
             load_question_set(selected_sets)
     else:
-        st.warning("No question sets found. Please add question files to the 'data' folder.")
+        st.warning("No question sets found.")
     
-    # Thông tin bài thi
     st.subheader("ℹ️ Test Information")
     total_q = len(st.session_state.current_questions)
-    st.info(f"Total Questions: **{total_q}**")
+    st.info("Total Questions: " + str(total_q))
     
-    # Đếm câu đã làm
     answered = len([a for a in st.session_state.user_answers.values() if a is not None])
-    st.info(f"Answered: **{answered}/{total_q}**")
+    st.info("Answered: " + str(answered) + "/" + str(total_q))
     
-    # Nút Reset
     if st.button("🔄 Reset All", use_container_width=True):
         reset_app()
     
-    # Hướng dẫn
     with st.expander("📝 How to Use"):
-        st.write("""
-        **Steps:**
-        1. Select Question Set from dropdown
-        2. Answer questions by clicking on options
-        3. Submit to see results
-        4. Review your performance
-        
-        **Scoring System:**
-        - Score based on correct answers ratio
-        - Band levels: Beginner to Advanced
-        - Maximum score: 495
-        """)
+        st.write("1. Select Question Set from dropdown")
+        st.write("2. Answer questions by clicking on options")
+        st.write("3. Submit to see results")
+        st.write("4. Review your performance")
+        st.write("")
+        st.write("Scoring System:")
+        st.write("- Score based on correct answers ratio")
+        st.write("- Band levels: Beginner to Advanced")
+        st.write("- Maximum score: 495")
 
 # Main content
 st.markdown("<h1 class='main-header'>📚 TOEIC Reading Practice & Assessment</h1>", unsafe_allow_html=True)
 
-# Hiển thị thông tin bộ câu hỏi hiện tại
+# Thông tin
 col1, col2, col3 = st.columns(3)
 with col1:
     st.metric("Total Questions", len(st.session_state.current_questions))
 with col2:
     answered = len([a for a in st.session_state.user_answers.values() if a is not None])
-    st.metric("Answered", f"{answered}/{len(st.session_state.current_questions)}")
+    st.metric("Answered", str(answered) + "/" + str(len(st.session_state.current_questions)))
 with col3:
     if st.session_state.submitted and len(st.session_state.current_questions) > 0:
         correct_count = 0
@@ -169,37 +150,20 @@ with col3:
             user_ans = st.session_state.user_answers.get(str(q['id']))
             if user_ans is not None and user_ans == q['correct']:
                 correct_count += 1
-        
         result = calculate_toeic_reading_score(correct_count, answered)
-        st.metric("Score", f"{result['score']}/495")
+        st.metric("Score", str(result['score']) + "/495")
 
-# Hiển thị câu hỏi
+# Questions
 st.markdown("---")
 st.subheader("📝 Questions")
 
 if not st.session_state.current_questions:
-    st.warning("⚠️ No questions available. Please check your data files.")
+    st.warning("No questions available. Please check your data files.")
     st.info("How to add questions:")
-    st.write("""
-    1. Create a new file in the data folder
-    2. Define a QUESTIONS list with the correct format
-    3. The app will automatically detect it
-    
-    Example format:
-    QUESTIONS = [
-        {
-            'id': 1,
-            'part': 'Part 5',
-            'section': 'Incomplete Sentences',
-            'question': 'Your question here?',
-            'options': ['Option A', 'Option B', 'Option C', 'Option D'],
-            'correct': 0,
-            'explanation': 'Explanation for the correct answer'
-        }
-    ]
-    """)
+    st.write("1. Create a new file in the data folder")
+    st.write("2. Define a QUESTIONS list with the correct format")
+    st.write("3. The app will automatically detect it")
 else:
-    # Nhóm câu hỏi theo phần
     questions_by_part = {}
     for q in st.session_state.current_questions:
         part = q.get('part', 'Unknown')
@@ -207,7 +171,6 @@ else:
             questions_by_part[part] = []
         questions_by_part[part].append(q)
     
-    # Tạo tabs cho từng phần
     tab_names = list(questions_by_part.keys())
     if tab_names:
         tabs = st.tabs(tab_names)
@@ -216,19 +179,18 @@ else:
             with tabs[i]:
                 section_name = SECTIONS.get(part, {}).get('name', '')
                 if section_name:
-                    st.write(f"### {part} - {section_name}")
+                    st.write("### " + part + " - " + section_name)
                 else:
-                    st.write(f"### {part}")
+                    st.write("### " + part)
                 
                 for q in questions:
                     with st.container():
-                        # Hiển thị câu hỏi
-                        question_html = f'''
-                        <div class="question-container">
-                            <p><b>{q['id']}. {q['question']}</b></p>
-                        </div>
-                        '''
-                        st.markdown(question_html, unsafe_allow_html=True)
+                        st.markdown(
+                            '<div class="question-container"><p><b>' + 
+                            str(q['id']) + '. ' + q['question'] + 
+                            '</b></p></div>',
+                            unsafe_allow_html=True
+                        )
                         
                         options = q['options']
                         user_ans = get_user_answer(q['id'])
@@ -240,7 +202,7 @@ else:
                         selected = st.radio(
                             "Choose your answer:",
                             options,
-                            key=f"q_{q['id']}",
+                            key="q_" + str(q['id']),
                             index=default_index,
                             horizontal=True,
                             label_visibility="collapsed"
@@ -254,19 +216,18 @@ else:
                             correct = q['correct']
                             if selected and selected_index is not None:
                                 is_correct = selected_index == correct
-                                
                                 if is_correct:
-                                    st.success("✅ Correct!")
+                                    st.success("Correct!")
                                 else:
-                                    st.error(f"❌ Incorrect. Correct answer: {options[correct]}")
+                                    st.error("Incorrect. Correct answer: " + options[correct])
                                     if 'explanation' in q:
-                                        st.info(f"💡 Explanation: {q['explanation']}")
+                                        st.info("Explanation: " + q['explanation'])
                             else:
-                                st.warning("⚠️ Not answered")
+                                st.warning("Not answered")
                         
                         st.markdown("---")
 
-# Nút Submit và xem kết quả
+# Submit button
 if len(st.session_state.current_questions) > 0:
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
@@ -279,7 +240,7 @@ if len(st.session_state.current_questions) > 0:
                 st.session_state.submitted = False
                 st.rerun()
 
-# Hiển thị kết quả chi tiết
+# Results
 if st.session_state.submitted and len(st.session_state.current_questions) > 0:
     st.markdown("---")
     st.subheader("📊 Your Results")
@@ -303,48 +264,38 @@ if st.session_state.submitted and len(st.session_state.current_questions) > 0:
     
     result = calculate_toeic_reading_score(total_correct, total_attempted)
     
-    # Hiển thị kết quả
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        score_html = f'''
-        <div class="score-card">
-            <h3>Score</h3>
-            <h1 style="font-size: 48px;">{result['score']}</h1>
-            <p>/ 495</p>
-        </div>
-        '''
-        st.markdown(score_html, unsafe_allow_html=True)
-    
+        st.markdown(
+            '<div class="score-card"><h3>Score</h3><h1 style="font-size: 48px;">' + 
+            str(result['score']) + 
+            '</h1><p>/ 495</p></div>',
+            unsafe_allow_html=True
+        )
     with col2:
-        correct_html = f'''
-        <div class="score-card">
-            <h3>Correct</h3>
-            <h1 style="font-size: 48px;">{total_correct}/{total_attempted}</h1>
-            <p>{result['correct_percentage']}%</p>
-        </div>
-        '''
-        st.markdown(correct_html, unsafe_allow_html=True)
-    
+        st.markdown(
+            '<div class="score-card"><h3>Correct</h3><h1 style="font-size: 48px;">' + 
+            str(total_correct) + '/' + str(total_attempted) + 
+            '</h1><p>' + str(result['correct_percentage']) + '%</p></div>',
+            unsafe_allow_html=True
+        )
     with col3:
-        band_html = f'''
-        <div class="score-card">
-            <h3>Band Level</h3>
-            <h2 style="font-size: 24px;">{result['band_level']}</h2>
-        </div>
-        '''
-        st.markdown(band_html, unsafe_allow_html=True)
-    
+        st.markdown(
+            '<div class="score-card"><h3>Band Level</h3><h2 style="font-size: 24px;">' + 
+            result['band_level'] + 
+            '</h2></div>',
+            unsafe_allow_html=True
+        )
     with col4:
         status_class = 'status-pass' if result['status'] == 'Pass' else 'status-fail'
-        status_html = f'''
-        <div class="score-card">
-            <h3>Status</h3>
-            <h1 class="{status_class}" style="font-size: 40px;">{result['status']}</h1>
-        </div>
-        '''
-        st.markdown(status_html, unsafe_allow_html=True)
+        st.markdown(
+            '<div class="score-card"><h3>Status</h3><h1 class="' + 
+            status_class + '" style="font-size: 40px;">' + 
+            result['status'] + 
+            '</h1></div>',
+            unsafe_allow_html=True
+        )
     
-    # Phân tích theo phần
     if correct_by_section or attempted_by_section:
         st.subheader("📈 Performance by Section")
         section_scores = get_section_scores(correct_by_section, attempted_by_section)
@@ -355,7 +306,7 @@ if st.session_state.submitted and len(st.session_state.current_questions) > 0:
                 'Section': section,
                 'Correct': data['correct'],
                 'Attempted': data['attempted'],
-                'Accuracy': f"{data['percentage']}%",
+                'Accuracy': str(data['percentage']) + '%',
                 'Status': data['status']
             })
         
@@ -363,32 +314,29 @@ if st.session_state.submitted and len(st.session_state.current_questions) > 0:
             df = pd.DataFrame(section_data)
             st.dataframe(df, use_container_width=True, hide_index=True)
     
-    # Lời khuyên
     st.subheader("💡 Recommendations")
     score = result['score']
     if score >= 400:
-        st.success("🌟 Excellent! You have a strong command of English reading. Keep practicing to maintain your level.")
+        st.success("Excellent! You have a strong command of English reading.")
         st.balloons()
     elif score >= 300:
-        st.info("📈 Good job! You have a solid foundation. Focus on your weaker sections to improve.")
+        st.info("Good job! You have a solid foundation.")
     elif score >= 200:
-        st.warning("📚 Keep practicing! Work on building vocabulary and reading comprehension skills.")
+        st.warning("Keep practicing! Work on building vocabulary.")
     else:
-        st.error("💪 Don't give up! Start with basic reading materials and practice regularly.")
+        st.error("Don't give up! Start with basic reading materials.")
     
-    # Đề xuất bài tập
     if section_data:
         st.subheader("📚 Suggested Practice")
         weak_sections = [s for s, d in section_scores.items() if d['percentage'] < 70]
         if weak_sections:
-            st.write(f"🎯 Focus on improving: **{', '.join(weak_sections)}**")
-            st.write("Try more practice questions in these sections to improve your score.")
+            st.write("Focus on improving: " + ', '.join(weak_sections))
         else:
-            st.write("🎉 You're doing great in all sections! Try more challenging questions to continue improving.")
+            st.write("You're doing great in all sections!")
 
 # Footer
 st.markdown("---")
-st.caption("💡 Tip: You can add more question files in the 'data' folder. The app will automatically detect them.")
+st.caption("Tip: You can add more question files in the 'data' folder.")
 
 if st.session_state.current_questions:
-    st.caption(f"📊 Currently loaded: {len(st.session_state.current_questions)} questions from {', '.join(st.session_state.question_sets)}")
+    st.caption("Loaded: " + str(len(st.session_state.current_questions)) + " questions from " + ', '.join(st.session_state.question_sets))
