@@ -4,7 +4,6 @@ TOEIC_CONFIG = {
     'passing_score': 300,    # Điểm đạt
     'max_score': 495,        # Điểm tối đa TOEIC Reading
     'min_score': 5,          # Điểm tối thiểu
-    'score_per_question': 4.95,  # Mỗi câu đúng được bao nhiêu điểm
 }
 
 # Cấu hình hiển thị
