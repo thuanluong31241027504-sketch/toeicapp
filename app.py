@@ -107,11 +107,9 @@ with st.sidebar:
         # Xác định default values
         default_values = []
         if 'questions' in st.session_state.question_sets:
-            # Nếu đang dùng bộ 'questions', chọn nó
             if 'questions' in available_sets:
                 default_values = ['questions']
         elif st.session_state.question_sets:
-            # Nếu đang dùng bộ khác, chọn bộ đó
             default_values = [s for s in st.session_state.question_sets if s in available_sets]
         
         selected_sets = st.multiselect(
@@ -164,7 +162,6 @@ with col2:
     st.metric("Answered", f"{answered}/{len(st.session_state.current_questions)}")
 with col3:
     if st.session_state.submitted and len(st.session_state.current_questions) > 0:
-        # Tính điểm dựa trên câu trả lời
         correct_count = 0
         for q in st.session_state.current_questions:
             user_ans = st.session_state.user_answers.get(str(q['id']))
@@ -180,8 +177,8 @@ st.subheader("📝 Questions")
 
 if not st.session_state.current_questions:
     st.warning("⚠️ No questions available. Please check your data files.")
-    st.info("""
-    **How to add questions:**
+    st.info("How to add questions:")
+    st.markdown("""
     1. Create a new file in the `data` folder
     2. Define a `QUESTIONS` list with the correct format
     3. The app will automatically detect it
@@ -195,7 +192,7 @@ if not st.session_state.current_questions:
             'section': 'Incomplete Sentences',
             'question': 'Your question here?',
             'options': ['Option A', 'Option B', 'Option C', 'Option D'],
-            'correct': 0,  # Index of correct answer (0-based)
+            'correct': 0,
             'explanation': 'Explanation for the correct answer'
         }
     ]
