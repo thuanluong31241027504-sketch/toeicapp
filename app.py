@@ -22,8 +22,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# CSS tùy chỉnh
-st.markdown("""
+# CSS tùy chỉnh - Sử dụng chuỗi đơn
+css_style = '''
 <style>
     .main-header {
         color: #FF4B4B;
@@ -63,7 +63,8 @@ st.markdown("""
         gap: 20px;
     }
 </style>
-""", unsafe_allow_html=True)
+'''
+st.markdown(css_style, unsafe_allow_html=True)
 
 # Khởi tạo session state
 if 'current_questions' not in st.session_state:
@@ -138,16 +139,17 @@ with st.sidebar:
     
     # Hướng dẫn
     with st.expander("📝 How to Use"):
-        st.markdown("""
-        1. **Select Question Set**: Chọn bộ câu hỏi từ dropdown
-        2. **Answer Questions**: Chọn đáp án cho từng câu hỏi
-        3. **Submit**: Nhấn Submit để xem kết quả
-        4. **Review**: Xem điểm và phân tích chi tiết
+        st.write("""
+        **Steps:**
+        1. Select Question Set from dropdown
+        2. Answer questions by clicking on options
+        3. Submit to see results
+        4. Review your performance
         
         **Scoring System:**
-        - Điểm được tính dựa trên tỷ lệ câu đúng
-        - Band điểm từ Beginner đến Advanced
-        - Điểm tối đa: 495
+        - Score based on correct answers ratio
+        - Band levels: Beginner to Advanced
+        - Maximum score: 495
         """)
 
 # Main content
@@ -178,13 +180,12 @@ st.subheader("📝 Questions")
 if not st.session_state.current_questions:
     st.warning("⚠️ No questions available. Please check your data files.")
     st.info("How to add questions:")
-    st.markdown("""
-    1. Create a new file in the `data` folder
-    2. Define a `QUESTIONS` list with the correct format
+    st.write("""
+    1. Create a new file in the data folder
+    2. Define a QUESTIONS list with the correct format
     3. The app will automatically detect it
     
-    **Example format:**
-    ```python
+    Example format:
     QUESTIONS = [
         {
             'id': 1,
@@ -196,3 +197,198 @@ if not st.session_state.current_questions:
             'explanation': 'Explanation for the correct answer'
         }
     ]
+    """)
+else:
+    # Nhóm câu hỏi theo phần
+    questions_by_part = {}
+    for q in st.session_state.current_questions:
+        part = q.get('part', 'Unknown')
+        if part not in questions_by_part:
+            questions_by_part[part] = []
+        questions_by_part[part].append(q)
+    
+    # Tạo tabs cho từng phần
+    tab_names = list(questions_by_part.keys())
+    if tab_names:
+        tabs = st.tabs(tab_names)
+        
+        for i, (part, questions) in enumerate(questions_by_part.items()):
+            with tabs[i]:
+                section_name = SECTIONS.get(part, {}).get('name', '')
+                if section_name:
+                    st.write(f"### {part} - {section_name}")
+                else:
+                    st.write(f"### {part}")
+                
+                for q in questions:
+                    with st.container():
+                        # Hiển thị câu hỏi
+                        question_html = f'''
+                        <div class="question-container">
+                            <p><b>{q['id']}. {q['question']}</b></p>
+                        </div>
+                        '''
+                        st.markdown(question_html, unsafe_allow_html=True)
+                        
+                        options = q['options']
+                        user_ans = get_user_answer(q['id'])
+                        
+                        default_index = None
+                        if user_ans is not None and isinstance(user_ans, int) and 0 <= user_ans < len(options):
+                            default_index = user_ans
+                        
+                        selected = st.radio(
+                            "Choose your answer:",
+                            options,
+                            key=f"q_{q['id']}",
+                            index=default_index,
+                            horizontal=True,
+                            label_visibility="collapsed"
+                        )
+                        
+                        if selected:
+                            selected_index = options.index(selected)
+                            st.session_state.user_answers[str(q['id'])] = selected_index
+                        
+                        if st.session_state.submitted:
+                            correct = q['correct']
+                            if selected and selected_index is not None:
+                                is_correct = selected_index == correct
+                                
+                                if is_correct:
+                                    st.success("✅ Correct!")
+                                else:
+                                    st.error(f"❌ Incorrect. Correct answer: {options[correct]}")
+                                    if 'explanation' in q:
+                                        st.info(f"💡 Explanation: {q['explanation']}")
+                            else:
+                                st.warning("⚠️ Not answered")
+                        
+                        st.markdown("---")
+
+# Nút Submit và xem kết quả
+if len(st.session_state.current_questions) > 0:
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        if not st.session_state.submitted:
+            if st.button("📊 Submit & Get Score", use_container_width=True, type="primary"):
+                st.session_state.submitted = True
+                st.rerun()
+        else:
+            if st.button("📝 Review Answers", use_container_width=True):
+                st.session_state.submitted = False
+                st.rerun()
+
+# Hiển thị kết quả chi tiết
+if st.session_state.submitted and len(st.session_state.current_questions) > 0:
+    st.markdown("---")
+    st.subheader("📊 Your Results")
+    
+    total_correct = 0
+    total_attempted = 0
+    correct_by_section = {}
+    attempted_by_section = {}
+    
+    for q in st.session_state.current_questions:
+        part = q.get('part', 'Unknown')
+        user_ans = st.session_state.user_answers.get(str(q['id']))
+        
+        if user_ans is not None:
+            total_attempted += 1
+            attempted_by_section[part] = attempted_by_section.get(part, 0) + 1
+            
+            if user_ans == q['correct']:
+                total_correct += 1
+                correct_by_section[part] = correct_by_section.get(part, 0) + 1
+    
+    result = calculate_toeic_reading_score(total_correct, total_attempted)
+    
+    # Hiển thị kết quả
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        score_html = f'''
+        <div class="score-card">
+            <h3>Score</h3>
+            <h1 style="font-size: 48px;">{result['score']}</h1>
+            <p>/ 495</p>
+        </div>
+        '''
+        st.markdown(score_html, unsafe_allow_html=True)
+    
+    with col2:
+        correct_html = f'''
+        <div class="score-card">
+            <h3>Correct</h3>
+            <h1 style="font-size: 48px;">{total_correct}/{total_attempted}</h1>
+            <p>{result['correct_percentage']}%</p>
+        </div>
+        '''
+        st.markdown(correct_html, unsafe_allow_html=True)
+    
+    with col3:
+        band_html = f'''
+        <div class="score-card">
+            <h3>Band Level</h3>
+            <h2 style="font-size: 24px;">{result['band_level']}</h2>
+        </div>
+        '''
+        st.markdown(band_html, unsafe_allow_html=True)
+    
+    with col4:
+        status_class = 'status-pass' if result['status'] == 'Pass' else 'status-fail'
+        status_html = f'''
+        <div class="score-card">
+            <h3>Status</h3>
+            <h1 class="{status_class}" style="font-size: 40px;">{result['status']}</h1>
+        </div>
+        '''
+        st.markdown(status_html, unsafe_allow_html=True)
+    
+    # Phân tích theo phần
+    if correct_by_section or attempted_by_section:
+        st.subheader("📈 Performance by Section")
+        section_scores = get_section_scores(correct_by_section, attempted_by_section)
+        
+        section_data = []
+        for section, data in section_scores.items():
+            section_data.append({
+                'Section': section,
+                'Correct': data['correct'],
+                'Attempted': data['attempted'],
+                'Accuracy': f"{data['percentage']}%",
+                'Status': data['status']
+            })
+        
+        if section_data:
+            df = pd.DataFrame(section_data)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    # Lời khuyên
+    st.subheader("💡 Recommendations")
+    score = result['score']
+    if score >= 400:
+        st.success("🌟 Excellent! You have a strong command of English reading. Keep practicing to maintain your level.")
+        st.balloons()
+    elif score >= 300:
+        st.info("📈 Good job! You have a solid foundation. Focus on your weaker sections to improve.")
+    elif score >= 200:
+        st.warning("📚 Keep practicing! Work on building vocabulary and reading comprehension skills.")
+    else:
+        st.error("💪 Don't give up! Start with basic reading materials and practice regularly.")
+    
+    # Đề xuất bài tập
+    if section_data:
+        st.subheader("📚 Suggested Practice")
+        weak_sections = [s for s, d in section_scores.items() if d['percentage'] < 70]
+        if weak_sections:
+            st.write(f"🎯 Focus on improving: **{', '.join(weak_sections)}**")
+            st.write("Try more practice questions in these sections to improve your score.")
+        else:
+            st.write("🎉 You're doing great in all sections! Try more challenging questions to continue improving.")
+
+# Footer
+st.markdown("---")
+st.caption("💡 Tip: You can add more question files in the 'data' folder. The app will automatically detect them.")
+
+if st.session_state.current_questions:
+    st.caption(f"📊 Currently loaded: {len(st.session_state.current_questions)} questions from {', '.join(st.session_state.question_sets)}")
