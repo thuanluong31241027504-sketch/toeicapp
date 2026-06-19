@@ -1,5 +1,3 @@
-import math
-
 def calculate_toeic_reading_score(correct_count, total_attempted):
     """
     Tính điểm TOEIC Reading dựa trên số câu đúng và số câu đã làm
@@ -20,8 +18,8 @@ def calculate_toeic_reading_score(correct_count, total_attempted):
     if total_attempted == 0:
         return {
             'score': 0,
-            'correct_percentage': 0,
-            'attempted_percentage': 0,
+            'correct_percentage': 0.0,
+            'attempted_percentage': 0.0,
             'band_level': 'No attempt',
             'status': 'Not started'
         }
@@ -93,7 +91,7 @@ def get_section_scores(correct_by_section, attempted_by_section):
             score = int((percentage / 100) * 100)  # Điểm phần
             status = 'Good' if percentage >= 70 else 'Needs Improvement'
         else:
-            percentage = 0
+            percentage = 0.0
             score = 0
             status = 'Not attempted'
         
